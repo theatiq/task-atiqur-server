@@ -52,23 +52,71 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         // await client.connect();
         const tasksCollection = client.db("taskDB").collection('tasks')
- 
+
 
         app.post('/tasks', async (req, res) => {
-          const { title, description, category } = req.body;
-          const newTask = {
-            title,
-            description,
-            category: category || 'To-Do',
-            timestamp: new Date(),
-          };
-        
-          try {
-            const result = await tasksCollection.insertOne(newTask);
-            res.status(201).json(result.ops[0]);
-          } catch (err) {
-            res.status(500).json({ error: 'Failed to add task' });
-          }
+            const { title, description, category } = req.body;
+            const newTask = {
+                title,
+                description,
+                category: category || 'To-Do',
+                timestamp: new Date(),
+            };
+
+            try {
+                const result = await tasksCollection.insertOne(newTask);
+                res.status(201).json(result.ops[0]);
+            } catch (err) {
+                res.status(500).json({ error: 'Failed to add task' });
+            }
+        });
+
+
+        // 2. Get all tasks
+        app.get('/tasks', async (req, res) => {
+            try {
+                const tasks = await tasksCollection.find().toArray();
+                res.json(tasks);
+            } catch (err) {
+                res.status(500).json({ error: 'Failed to fetch tasks' });
+            }
+        });
+
+        // 3. Update a task
+        app.put('/tasks/:id', async (req, res) => {
+            const { id } = req.params;
+            const updatedTask = req.body;
+
+            try {
+                const result = await tasksCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: updatedTask }
+                );
+                if (result.modifiedCount === 1) {
+                    res.json({ message: 'Task updated' });
+                } else {
+                    res.status(404).json({ error: 'Task not found' });
+                }
+            } catch (err) {
+                res.status(500).json({ error: 'Failed to update task' });
+            }
+        });
+
+
+        // 4. Delete a task
+        app.delete('/tasks/:id', async (req, res) => {
+            const { id } = req.params;
+
+            try {
+                const result = await tasksCollection.deleteOne({ _id: new ObjectId(id) });
+                if (result.deletedCount === 1) {
+                    res.json({ message: 'Task deleted' });
+                } else {
+                    res.status(404).json({ error: 'Task not found' });
+                }
+            } catch (err) {
+                res.status(500).json({ error: 'Failed to delete task' });
+            }
         });
 
 
@@ -97,7 +145,7 @@ async function run() {
 
 
 
-  
+
         // Send a ping to confirm a successful connection
         // todo Comment it before deployment.
         // await client.db("admin").command({ ping: 1 });
