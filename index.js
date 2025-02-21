@@ -1,10 +1,19 @@
 require("dotenv").config()
 const express = require('express');
-const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const http = require('http');
+const socketIo = require('socket.io');
+const cors = require('cors');
 const app = express()
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: 'http://localhost:5173', // Your React frontend URL
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  },
+});
 const port = process.env.PORT || 5000
 
 app.use(cors({
@@ -83,40 +92,72 @@ async function run() {
         });
 
         // 3. Update a task
-        app.put('/tasks/:id', async (req, res) => {
-            const { id } = req.params;
-            const updatedTask = req.body;
+        // app.put('/tasks/:id', async (req, res) => {
+        //     const { id } = req.params;
+        //     const updatedTask = req.body;
 
-            try {
-                const result = await tasksCollection.updateOne(
-                    { _id: new ObjectId(id) },
-                    { $set: updatedTask }
-                );
-                if (result.modifiedCount === 1) {
-                    res.json({ message: 'Task updated' });
-                } else {
-                    res.status(404).json({ error: 'Task not found' });
-                }
-            } catch (err) {
-                res.status(500).json({ error: 'Failed to update task' });
-            }
+        //     try {
+        //         const result = await tasksCollection.updateOne(
+        //             { _id: new ObjectId(id) },
+        //             { $set: updatedTask }
+        //         );
+        //         if (result.modifiedCount === 1) {
+        //             res.json({ message: 'Task updated' });
+        //         } else {
+        //             res.status(404).json({ error: 'Task not found' });
+        //         }
+        //     } catch (err) {
+        //         res.status(500).json({ error: 'Failed to update task' });
+        //     }
+        // });
+
+
+        app.put('/tasks/:id', async (req, res) => {
+          const { id } = req.params;
+          const updatedTask = req.body;
+        
+          try {
+            await tasksCollection.updateOne({ _id: new ObjectId(id) }, { $set: updatedTask });
+            const tasks = await tasksCollection.find({}).toArray();
+            io.emit('taskUpdated', tasks); // Broadcast updated tasks to all clients
+            res.json({ message: 'Task updated' });
+          } catch (err) {
+            res.status(500).json({ error: 'Failed to update task' });
+          }
         });
 
 
         // 4. Delete a task
-        app.delete('/tasks/:id', async (req, res) => {
-            const { id } = req.params;
+        // app.delete('/tasks/:id', async (req, res) => {
+        //     const { id } = req.params;
 
-            try {
-                const result = await tasksCollection.deleteOne({ _id: new ObjectId(id) });
-                if (result.deletedCount === 1) {
-                    res.json({ message: 'Task deleted' });
-                } else {
-                    res.status(404).json({ error: 'Task not found' });
-                }
-            } catch (err) {
-                res.status(500).json({ error: 'Failed to delete task' });
+        //     try {
+        //         const result = await tasksCollection.deleteOne({ _id: new ObjectId(id) });
+        //         if (result.deletedCount === 1) {
+        //             res.json({ message: 'Task deleted' });
+        //         } else {
+        //             res.status(404).json({ error: 'Task not found' });
+        //         }
+        //     } catch (err) {
+        //         res.status(500).json({ error: 'Failed to delete task' });
+        //     }
+        // });
+
+        app.delete('/tasks/:id', async (req, res) => {
+          const { id } = req.params;
+        
+          try {
+            const result = await tasksCollection.deleteOne({ _id: new ObjectId(id) });
+            if (result.deletedCount === 1) {
+              const tasks = await tasksCollection.find({}).toArray();
+              io.emit('taskUpdated', tasks); // Broadcast updated tasks to all clients
+              res.json({ message: 'Task deleted' });
+            } else {
+              res.status(404).json({ error: 'Task not found' });
             }
+          } catch (err) {
+            res.status(500).json({ error: 'Failed to delete task' });
+          }
         });
 
 

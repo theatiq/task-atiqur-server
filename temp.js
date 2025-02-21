@@ -1,3 +1,104 @@
+const express = require('express');
+const { MongoClient, ObjectId } = require('mongodb');
+const http = require('http');
+const socketIo = require('socket.io');
+const cors = require('cors');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: 'http://localhost:3000', // Your React frontend URL
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  },
+});
+
+app.use(cors());
+app.use(express.json());
+
+const mongoUrl = 'mongodb://localhost:27017'; // Your MongoDB connection
+const client = new MongoClient(mongoUrl);
+const dbName = 'taskManager';
+let tasksCollection;
+
+client.connect().then(() => {
+  const db = client.db(dbName);
+  tasksCollection = db.collection('tasks');
+});
+
+// Fetch all tasks
+app.get('/tasks', async (req, res) => {
+  const tasks = await tasksCollection.find({}).toArray();
+  res.json(tasks);
+});
+
+// Update a task (e.g., change category)
+app.put('/tasks/:id', async (req, res) => {
+  const { id } = req.params;
+  const updatedTask = req.body;
+
+  try {
+    await tasksCollection.updateOne({ _id: new ObjectId(id) }, { $set: updatedTask });
+    const tasks = await tasksCollection.find({}).toArray();
+    io.emit('taskUpdated', tasks); // Broadcast updated tasks to all clients
+    res.json({ message: 'Task updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update task' });
+  }
+});
+
+// Delete a task
+app.delete('/tasks/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await tasksCollection.deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 1) {
+      const tasks = await tasksCollection.find({}).toArray();
+      io.emit('taskUpdated', tasks); // Broadcast updated tasks to all clients
+      res.json({ message: 'Task deleted' });
+    } else {
+      res.status(404).json({ error: 'Task not found' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete task' });
+  }
+});
+
+// Start the server
+server.listen(5000, () => {
+  console.log('Server is running on http://localhost:5000');
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const express = require('express');
 const cors = require('cors');
